@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env
+.env.*.local
+prisma/*.db*
+*.tsbuildinfo
+test-results/
+*.log
+.local/
+
+# Local databases and private configuration
+*.db
+*.db-*
+.env.*
+!.env.example
