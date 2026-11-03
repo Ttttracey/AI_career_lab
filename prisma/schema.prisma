@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id             String                 @id
+  name           String                 @default("本地学习者")
+  background     String                 @default("")
+  experience     String                 @default("")
+  targetRole     String                 @default("")
+  dailyMinutes   Int                    @default(30)
+  timezone       String                 @default("Asia/Shanghai")
+  onboardingStep Int                    @default(0)
+  createdAt      DateTime               @default(now())
+  jobs           JobTarget[]
+  assessments    Assessment[]
+  plans          LearningPlan[]
+  progress       LessonProgress[]
+  submissions    Submission[]
+  evaluations    Evaluation[]
+  evidence       SkillEvidence[]
+  interviews     InterviewSession[]
+  conversations  LearningConversation[]
+  events         GrowthEvent[]
+  views          HomeContentView[]
+  snapshots      ArchiveSnapshot[]
+  documents      SourceDocument[]
+  imports        ImportBatch[]
+  catalog        CatalogItem[]
+  quizAttempts   QuizAttempt[]
+  practice       PracticeAttempt[]
+  retests        RetestSession[]
+}
+
+model JobTarget {
+  id          String      @id @default(cuid())
+  userId      String      @unique
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  original    String
+  analysis    String      @default("{}")
+  demo        Boolean     @default(true)
+  confirmedAt DateTime?
+  updatedAt   DateTime    @updatedAt
+}
+
+model SkillDefinition {
+  id            String          @id
+  name          String
+  description   String
+  anchors       String
+  rubricVersion String
+  evidence      SkillEvidence[]
+}
+
+model Assessment {
+  id          String      @id @default(cuid())
+  userId      String      @unique
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions   String
+  answers     String      @default("{}")
+  completedAt DateTime?
+  updatedAt   DateTime    @updatedAt
+}
+
+model LearningPlan {
+  id        String      @id @default(cuid())
+  userId    String
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version   Int
+  createdAt DateTime    @default(now())
+  items     PlanItem[]
+
+  @@unique([userId, version])
+}
+
+model PlanItem {
+  id            String       @id @default(cuid())
+  planId        String
+  plan          LearningPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  resourceId    String
+  kind          String
+  position      Int
+  minutes       Int
+  skills        String
+  prerequisites String
+  reason        String
+  status        String       @default("todo")
+  scheduledDate String?
+
+  @@unique([planId, resourceId])
+}
+
+model Lesson {
+  id       String           @id
+  title    String
+  minutes  Int
+  skills   String
+  content  String
+  sources  String           @default("[]")
+  progress LessonProgress[]
+}
+
+model LessonProgress {
+  id          String      @id @default(cuid())
+  userId      String
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson      @relation(fields: [lessonId], references: [id])
+  answers     String      @default("{}")
+  result      String      @default("{}")
+  completedAt DateTime?
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([userId, lessonId])
+}
+
+model Project {
+  id          String             @id
+  title       String
+  background  String
+  constraints String
+  tasks       ProjectTask[]
+  interviews  InterviewSession[]
+}
+
+model ProjectTask {
+  id           String       @id
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id])
+  title        String
+  position     Int
+  skills       String
+  template     String
+  requirements String
+  rubric       String
+  hints        String
+  reference    String
+  submissions  Submission[]
+}
+
+model Submission {
+  id         String      @id @default(cuid())
+  userId     String
+  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId     String
+  task       ProjectTask @relation(fields: [taskId], references: [id])
+  version    Int
+  content    String
+  isDraft    Boolean     @default(false)
+  portfolio  Boolean     @default(false)
+  requestKey String      @unique
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([userId, taskId, version])
+}
+
+model Evaluation {
+  id            String          @id @default(cuid())
+  userId        String
+  user          UserProfile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceType    String
+  sourceId      String
+  scope         String
+  result        String
+  demo          Boolean
+  model         String
+  promptVersion String
+  rubricVersion String
+  createdAt     DateTime        @default(now())
+  evidence      SkillEvidence[]
+  suggestion    PlanSuggestion?
+
+  @@unique([userId, sourceType, sourceId])
+}
+
+model SkillEvidence {
+  id           String          @id @default(cuid())
+  userId       String
+  user         UserProfile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillId      String
+  skill        SkillDefinition @relation(fields: [skillId], references: [id])
+  evaluationId String
+  evaluation   Evaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  level        Int
+  sourceId     String
+  quote        String
+  startOffset  Int
+  endOffset    Int
+  createdAt    DateTime        @default(now())
+
+  @@unique([evaluationId, skillId, sourceId, startOffset])
+}
+
+model PlanSuggestion {
+  id           String     @id @default(cuid())
+  evaluationId String     @unique
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  resourceId   String
+  reason       String
+  status       String     @default("pending")
+  createdAt    DateTime   @default(now())
+}
+
+model InterviewSession {
+  id             String          @id @default(cuid())
+  userId         String
+  user           UserProfile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String
+  projectId      String?
+  project        Project?        @relation(fields: [projectId], references: [id])
+  projectContext String          @default("")
+  mode           String
+  status         String          @default("active")
+  requestKey     String          @unique
+  demo           Boolean
+  createdAt      DateTime        @default(now())
+  endedAt        DateTime?
+  turns          InterviewTurn[]
+}
+
+model InterviewTurn {
+  id         String           @id @default(cuid())
+  sessionId  String
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  position   Int
+  mainIndex  Int
+  parentId   String?
+  question   String
+  skillId    String
+  answer     String?
+  draft      String           @default("")
+  answerKey  String?          @unique
+  answeredAt DateTime?
+
+  @@unique([sessionId, position])
+}
+
+model LearningConversation {
+  id        String      @id @default(cuid())
+  userId    String
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contextId String
+  messages  Message[]
+
+  @@unique([userId, contextId])
+}
+
+model Message {
+  id             String               @id @default(cuid())
+  conversationId String
+  conversation   LearningConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  requestKey     String               @unique
+  demo           Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+}
+
+model GrowthEvent {
+  id        String      @id @default(cuid())
+  userId    String
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  sourceId  String
+  xp        Int
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, type, sourceId])
+}
+
+model HomeContent {
+  id          String            @id
+  type        String
+  text        String
+  sourceUrl   String?
+  publishedAt DateTime?
+  verified    Boolean           @default(false)
+  enabled     Boolean           @default(true)
+  views       HomeContentView[]
+}
+
+model HomeContentView {
+  id        String      @id @default(cuid())
+  userId    String
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  localDate String
+  contentId String
+  content   HomeContent @relation(fields: [contentId], references: [id])
+
+  @@unique([userId, localDate])
+}
+
+model ArchiveSnapshot {
+  id        String      @id @default(cuid())
+  userId    String
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  sourceId  String
+  version   Int
+  title     String
+  content   String
+  hash      String
+  origin    String      @default("saved")
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, kind, sourceId, version])
+}
+
+model SourceDocument {
+  id         String        @id @default(cuid())
+  userId     String
+  user       UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  mime       String
+  bytes      Int
+  sha256     String
+  storageKey String
+  pageCount  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  items      CatalogItem[]
+
+  @@unique([userId, sha256])
+}
+
+model ImportBatch {
+  id          String      @id @default(cuid())
+  userId      String
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename    String
+  requestKey  String      @unique
+  status      String      @default("preview")
+  preview     String
+  result      String      @default("{}")
+  createdAt   DateTime    @default(now())
+  committedAt DateTime?
+}
+
+model CatalogItem {
+  id               String            @id @default(cuid())
+  userId           String
+  user             UserProfile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId       String?
+  document         SourceDocument?   @relation(fields: [documentId], references: [id])
+  kind             String
+  title            String
+  body             String
+  skillIds         String
+  lessonIds        String            @default("[]")
+  questionType     String            @default("scenario")
+  options          String            @default("[]")
+  answerIndex      Int?
+  reference        String            @default("")
+  rubric           String            @default("")
+  sourceLabel      String
+  sourceUrl        String            @default("")
+  locator          String            @default("")
+  publishedDate    String            @default("")
+  origin           String            @default("import")
+  status           String            @default("pending")
+  verificationNote String            @default("")
+  verifiedAt       DateTime?
+  hash             String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  attempts         PracticeAttempt[]
+
+  @@unique([userId, hash])
+}
+
+model QuizAttempt {
+  id               String      @id @default(cuid())
+  userId           String
+  user             UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId         String
+  questionSnapshot String
+  answers          String
+  result           String
+  requestKey       String      @unique
+  createdAt        DateTime    @default(now())
+}
+
+model PracticeAttempt {
+  id               String      @id @default(cuid())
+  userId           String
+  user             UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId           String
+  item             CatalogItem @relation(fields: [itemId], references: [id])
+  questionSnapshot String
+  answer           String
+  result           String      @default("{}")
+  requestKey       String      @unique
+  createdAt        DateTime    @default(now())
+}
+
+model RetestSession {
+  id            String      @id @default(cuid())
+  userId        String
+  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions     String
+  answers       String      @default("{}")
+  status        String      @default("active")
+  requestKey    String      @unique
+  rubricVersion String
+  createdAt     DateTime    @default(now())
+  completedAt   DateTime?
+}
